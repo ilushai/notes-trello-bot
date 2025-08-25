@@ -28,21 +28,32 @@ def save_user_sheets(data):
 
 user_sheets = load_user_sheets()
 
-# --- Декоратор для проверки авторизации ---
+# --- Декоратор для проверки авторизации с логированием ---
 def authorized_only(handler):
+    """Декоратор, который пропускает к выполнению только авторизованных пользователей."""
     @wraps(handler)
     async def wrapper(message: types.Message, *args, **kwargs):
-        if message.from_user.id not in AUTHORIZED_USERS:
+        user_id = message.from_user.id
+        
+        # --- ДИАГНОСТИЧЕСКИЕ ЛОГИ ---
+        logging.info(f"--- ПРОВЕРКА ДОСТУПА ---")
+        logging.info(f"ID пользователя: {user_id} (тип: {type(user_id)})")
+        logging.info(f"Список разрешенных ID: {AUTHORIZED_USERS}")
+        # ---------------------------
+
+        if user_id not in AUTHORIZED_USERS:
+            logging.warning(f"!!! ДОСТУП ЗАПРЕЩЕН для ID: {user_id}")
             await message.reply(f"❌ **Доступ запрещен.**\n\nДля получения доступа обратитесь к: {ADMIN_USERNAME}")
             return
+        
+        logging.info(f"--- ДОСТУП РАЗРЕШЕН для ID: {user_id} ---")
         return await handler(message, *args, **kwargs)
     return wrapper
 
-# --- Команды бота (остаются без изменений) ---
+# --- Команды бота ---
 @dp.message_handler(commands=['start', 'help'])
 @authorized_only
 async def send_welcome(message: types.Message):
-    # ... (код этой функции не меняется)
     user_id = str(message.from_user.id)
     sheet_url = user_sheets.get(user_id)
     service_email = get_service_account_email()
@@ -70,7 +81,6 @@ async def send_welcome(message: types.Message):
 @dp.message_handler(commands=['set_sheet'])
 @authorized_only
 async def set_sheet(message: types.Message):
-    # ... (код этой функции не меняется)
     user_id = str(message.from_user.id)
     sheet_url = message.get_args()
     if not sheet_url or not sheet_url.startswith('https://docs.google.com/spreadsheets/d/'):
@@ -83,13 +93,12 @@ async def set_sheet(message: types.Message):
 @dp.message_handler(commands=['my_sheet'])
 @authorized_only
 async def my_sheet(message: types.Message):
-    # ... (код этой функции не меняется)
     user_id = str(message.from_user.id)
     sheet_url = user_sheets.get(user_id)
     if sheet_url: await message.reply(f"Текущая таблица для записи: [Ссылка на таблицу]({sheet_url})", parse_mode='Markdown')
     else: await message.reply("Таблица еще не настроена. Используй команду `/set_sheet`.")
 
-# --- НОВАЯ ИСПРАВЛЕННАЯ ЛОГИКА ОБРАБОТКИ ---
+# --- Основная логика обработки ---
 async def process_note(message: types.Message, text: str):
     """Общая логика для обработки и сохранения заметки с проверкой на админа."""
     user_id = message.from_user.id
@@ -102,14 +111,11 @@ async def process_note(message: types.Message, text: str):
     sheets_success = add_note_to_sheet(text, sheet_url)
     
     if sheets_success:
-        # Ответ по умолчанию для обычных пользователей
         reply_text = "✅ Записал в Google Sheets."
         
-        # Проверяем, является ли пользователь админом
         if user_id == ADMIN_ID:
             logging.info(f"Пользователь {user_id} является админом. Создаю карточку Trello.")
             if create_trello_card(text):
-                # Особый ответ для админа, если Trello сработал
                 reply_text = "✅ Записал в Google Sheets и создал карточку в Trello!"
         else:
             logging.info(f"Пользователь {user_id} не админ. Пропускаю Trello.")
@@ -118,7 +124,7 @@ async def process_note(message: types.Message, text: str):
     else:
         await message.reply("❌ **Ошибка при записи в Google Sheets!**")
 
-# --- Обработчики сообщений (остаются без изменений) ---
+# --- Обработчики сообщений ---
 @dp.message_handler(content_types=types.ContentType.TEXT)
 @authorized_only
 async def handle_text(message: types.Message):
@@ -127,7 +133,6 @@ async def handle_text(message: types.Message):
 @dp.message_handler(content_types=types.ContentType.VOICE)
 @authorized_only
 async def handle_voice(message: types.Message):
-    # ... (код этой функции не меняется)
     os.makedirs('temp', exist_ok=True)
     voice_file_path = os.path.join('temp', f"{message.voice.file_id}.ogg")
     try:
