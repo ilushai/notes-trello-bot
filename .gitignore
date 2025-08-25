@@ -1,0 +1,21 @@
+# Файлы конфигурации с секретными ключами
+my_config.py
+credentials.json
+
+# Файл с настройками пользователей
+user_sheets.json
+
+# Системные файлы и папки Python
+venv/
+__pycache__/
+*.pyc
+
+# Временные файлы
+.env
+*.xlsx
+temp/
+temp_*.ogg
+
+# Системные файлы IDE
+.idea/
+.vscode/
